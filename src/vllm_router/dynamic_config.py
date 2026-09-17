@@ -96,6 +96,7 @@ class DynamicRouterConfig:
             service_discovery=args.service_discovery,
             static_backends=args.static_backends,
             static_models=args.static_models,
+            static_model_labels=args.static_model_labels,
             static_model_types=args.static_model_types,
             static_aliases=args.static_aliases,
             static_backend_health_checks=args.static_backend_health_checks,
@@ -104,6 +105,8 @@ class DynamicRouterConfig:
             k8s_port=args.k8s_port,
             k8s_namespace=args.k8s_namespace,
             k8s_label_selector=args.k8s_label_selector,
+            prefill_model_labels=args.prefill_model_labels,
+            decode_model_labels=args.decode_model_labels,
             # Routing logic configurations
             routing_logic=args.routing_logic,
             session_key=args.session_key,
