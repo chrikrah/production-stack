@@ -52,7 +52,7 @@ ARGV = [
     "--priority-header",
     "x-priority",
     "--priority-field",
-    "priority",
+    "request_priority",
     "--priority-default",
     "7",
     "--priority-threshold",
@@ -93,6 +93,15 @@ def test_from_args_drops_no_field_the_parser_also_defines(parse):
     }
     shared = sorted(set(defaults) & set(vars(args)))
     assert shared, "no field name is shared, so this test would pass vacuously"
+
+    # A field the command line leaves at its dataclass default is invisible
+    # here, because a dropped assignment leaves it at that same value. Fail on
+    # that rather than pass quietly, so ARGV has to keep up with the dataclass.
+    at_default = [name for name in shared if getattr(args, name) == defaults[name]]
+    assert at_default == [], (
+        "ARGV leaves these fields at their dataclass default, so the check "
+        f"below cannot see them: {at_default}"
+    )
 
     dropped = [
         name
