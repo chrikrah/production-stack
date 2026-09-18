@@ -1,5 +1,4 @@
 import os
-import shutil
 
 import pytest
 
@@ -7,35 +6,23 @@ from vllm_router.services.batch_service import initialize_batch_processor
 from vllm_router.services.batch_service.batch import BatchStatus
 from vllm_router.services.files_service.file_storage import FileStorage
 
-TEST_BASE_PATH = "/tmp/test_vllm_batch"
 pytest_plugins = ("pytest_asyncio",)
 
 
-@pytest.fixture(autouse=True)
-def cleanup():
-    if os.path.exists(TEST_BASE_PATH):
-        shutil.rmtree(TEST_BASE_PATH)
-    yield
-    if os.path.exists(TEST_BASE_PATH):
-        shutil.rmtree(TEST_BASE_PATH)
+@pytest.fixture
+def processor(tmp_path):
+    storage = FileStorage(os.path.join(tmp_path, "files"))
+    return initialize_batch_processor("local", os.path.join(tmp_path, "db"), storage)
 
 
-def test_initialize_local_batch_processor():
+def test_initialize_local_batch_processor(processor):
     """app.py calls this whenever --enable-batch-api is passed, so an import
     error inside local_processor aborts router startup."""
-    storage = FileStorage(os.path.join(TEST_BASE_PATH, "files"))
-    processor = initialize_batch_processor(
-        "local", os.path.join(TEST_BASE_PATH, "db"), storage
-    )
     assert processor.db_path.endswith("batch_queue.db")
 
 
 @pytest.mark.asyncio
-async def test_create_and_retrieve_batch():
-    storage = FileStorage(os.path.join(TEST_BASE_PATH, "files"))
-    processor = initialize_batch_processor(
-        "local", os.path.join(TEST_BASE_PATH, "db"), storage
-    )
+async def test_create_and_retrieve_batch(processor):
     await processor.setup_db()
 
     created = await processor.create_batch(

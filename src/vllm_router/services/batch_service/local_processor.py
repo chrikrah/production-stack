@@ -124,8 +124,6 @@ class LocalBatchProcessor(BatchProcessor):
                     metadata,
                 ) = row
                 # Convert status string to BatchStatus enum.
-                from vllm_router.services.batch_service.batch import BatchStatus
-
                 return BatchInfo(
                     id=batch_id,
                     status=BatchStatus(status),
