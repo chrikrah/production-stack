@@ -28,7 +28,11 @@ def _make_discovery(command) -> K8sServiceNameServiceDiscovery:
     pods = MagicMock()
     pods.items = [pod]
 
+    service = MagicMock()
+    service.spec.selector = {"app": "vllm"}
+
     d.k8s_api = MagicMock()
+    d.k8s_api.read_namespaced_service.return_value = service
     d.k8s_api.list_namespaced_pod.return_value = pods
     return d
 
