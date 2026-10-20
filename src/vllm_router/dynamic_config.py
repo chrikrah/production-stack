@@ -15,7 +15,7 @@
 import json
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal, Optional
 
 from fastapi import FastAPI
@@ -72,6 +72,15 @@ class DynamicRouterConfig:
     priority_field: Optional[str] = "priority"
     priority_default: Optional[int] = 0
     priority_threshold: Optional[int] = None
+    # Left out of the file (None), these keep their startup value on reload.
+    kv_aware_threshold: Optional[int] = None
+    loadaware_beta: Optional[float] = None
+    prefix_min_match_length: Optional[int] = None
+    lmcache_controller_port: Optional[int] = None
+    lmcache_controller_reply_port: Optional[int] = None
+    lmcache_controller_heartbeat_port: Optional[int] = None
+    lmcache_health_check_interval: Optional[int] = None
+    lmcache_worker_timeout: Optional[int] = None
 
     # Logging Options
     callbacks: Optional[str] = None
@@ -111,8 +120,32 @@ class DynamicRouterConfig:
             priority_field=args.priority_field,
             priority_default=args.priority_default,
             priority_threshold=args.priority_threshold,
+            kv_aware_threshold=args.kv_aware_threshold,
+            loadaware_beta=args.loadaware_beta,
+            prefix_min_match_length=args.prefix_min_match_length,
+            lmcache_controller_port=args.lmcache_controller_port,
+            lmcache_controller_reply_port=args.lmcache_controller_reply_port,
+            lmcache_controller_heartbeat_port=args.lmcache_controller_heartbeat_port,
+            lmcache_health_check_interval=args.lmcache_health_check_interval,
+            lmcache_worker_timeout=args.lmcache_worker_timeout,
             # Logging Options
             callbacks=args.callbacks,
+        )
+
+    def keep_startup_routing_args(
+        self, startup: "DynamicRouterConfig"
+    ) -> "DynamicRouterConfig":
+        """
+        Returns a copy where every routing argument this config leaves unset
+        takes its value from the startup config.
+        """
+        return replace(
+            self,
+            **{
+                name: getattr(startup, name)
+                for name in STARTUP_ROUTING_ARGS
+                if getattr(self, name) is None
+            },
         )
 
     @staticmethod
@@ -128,6 +161,18 @@ class DynamicRouterConfig:
 
     def to_json_str(self) -> str:
         return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
+
+
+STARTUP_ROUTING_ARGS = (
+    "kv_aware_threshold",
+    "loadaware_beta",
+    "prefix_min_match_length",
+    "lmcache_controller_port",
+    "lmcache_controller_reply_port",
+    "lmcache_controller_heartbeat_port",
+    "lmcache_health_check_interval",
+    "lmcache_worker_timeout",
+)
 
 
 class DynamicConfigWatcher(metaclass=SingletonMeta):
@@ -155,6 +200,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         self.config_path = config_path
         self.config_file_type = config_file_type
         self.watch_interval = watch_interval
+        self.init_config = init_config
         self.current_config = init_config
         self.app = app
 
@@ -226,6 +272,14 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
             priority_field=config.priority_field,
             priority_default=config.priority_default,
             priority_threshold=config.priority_threshold,
+            kv_aware_threshold=config.kv_aware_threshold,
+            loadaware_beta=config.loadaware_beta,
+            prefix_min_match_length=config.prefix_min_match_length,
+            lmcache_controller_port=config.lmcache_controller_port,
+            lmcache_controller_reply_port=config.lmcache_controller_reply_port,
+            lmcache_controller_heartbeat_port=config.lmcache_controller_heartbeat_port,
+            lmcache_health_check_interval=config.lmcache_health_check_interval,
+            lmcache_worker_timeout=config.lmcache_worker_timeout,
         )
         self.app.state.router = routing_logic
         logger.info("DynamicConfigWatcher: Routing logic reconfiguration complete")
@@ -273,6 +327,19 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
                 break
             time.sleep(check_interval)
 
+    def load_config(self) -> DynamicRouterConfig:
+        """
+        Reads the config file and fills the routing arguments it leaves out
+        from the startup config.
+        """
+        if self.config_file_type == "YAML":
+            config = DynamicRouterConfig.from_yaml(self.config_path)
+        elif self.config_file_type == "JSON":
+            config = DynamicRouterConfig.from_json(self.config_path)
+        else:
+            raise ValueError("Unsupported config file type.")
+        return config.keep_startup_routing_args(self.init_config)
+
     def _watch_worker(self):
         """
         Watches the config file for changes and updates the DynamicRouterConfig accordingly.
@@ -281,12 +348,7 @@ class DynamicConfigWatcher(metaclass=SingletonMeta):
         """
         while self.running:
             try:
-                if self.config_file_type == "YAML":
-                    config = DynamicRouterConfig.from_yaml(self.config_path)
-                elif self.config_file_type == "JSON":
-                    config = DynamicRouterConfig.from_json(self.config_path)
-                else:
-                    raise ValueError("Unsupported config file type.")
+                config = self.load_config()
                 if config != self.current_config:
                     logger.info(
                         "DynamicConfigWatcher: Config changed, reconfiguring..."

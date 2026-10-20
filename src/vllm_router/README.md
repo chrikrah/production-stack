@@ -132,6 +132,7 @@ Currently, the dynamic config supports the following fields:
 - (When using `k8s` service discovery) `k8s_namespace`: The namespace of vLLM pods when using K8s service discovery. Default is `default`.
 - (When using `k8s` service discovery) `k8s_label_selector`: The label selector to filter vLLM pods when using K8s service discovery.
 - `session_key`: The key (in the header) to identify a session when using session-based routing.
+- `kv_aware_threshold`, `loadaware_beta`, `prefix_min_match_length`, `lmcache_controller_port`, `lmcache_controller_reply_port`, `lmcache_controller_heartbeat_port`, `lmcache_health_check_interval` and `lmcache_worker_timeout`: the same settings as the matching command-line options. A field the file leaves out keeps the value the router started with.
 
 Here is an example of a dynamic YAML config file:
 
